@@ -1,36 +1,37 @@
 import torch
-from torch import nn
-from torch.distributions import Normal
+import torch.nn as nn
+import torch.distributions as Normal
 
 
 class Critic(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_size):
+    def __init__(self, num_inputs, hidden_size=256):
         super(Critic, self).__init__()
         self.num_inputs = num_inputs
-        self.num_actions = num_actions
         self.hidden_size = hidden_size
-        self.q_network = nn.Sequential(
-            nn.Linear(self.num_inputs + num_actions, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, 1)
-        )
 
-    def forward(self, x):
-        return self.q_network(x)
+        self.fc1 = nn.Linear(self.num_inputs, self.hidden_size)
+        self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.fc3 = nn.Linear(self.hidden_size, self.hidden_size)
+
+    def forward(self, state, action):
+        x = torch.cat([state, action], 1)
+        x = nn.ReLU(self.fc1(x))
+        x = nn.ReLU(self.fc2(x))
+
+        return self.fc3(x)
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, max_action=1, reparam_noise=1e-6):
+    def __init__(self, input_size, output_size, max_action, reparam_noise=1e-6, max_sigma=2, hidden_size=256):
         super(Actor, self).__init__()
         self.input_size = input_size
-        self.hidden_size = hidden_size
         self.output_size = output_size
-        # environment specific scaling factor for actions
         self.max_action = torch.tensor(max_action)
-        # noise to prevent taking the log of 0
         self.reparam_noise = reparam_noise
+        self.max_sigma = max_sigma
+        self.hidden_size = hidden_size
+        # environment specific scaling factor for actions
+        # noise to prevent taking the log of 0
 
         self.fc1 = nn.Linear(self.input_size, self.hidden_size)
         self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
@@ -46,11 +47,12 @@ class Actor(nn.Module):
         mu = self.mu(x)
         sigma = self.sigma(x)
         # clip sigma values to reduce width of distribution
-        sigma = torch.clamp(sigma, min=self.reparam_noise, max=1)
+        sigma = torch.clamp(sigma, min=self.reparam_noise, max=self.max_sigma)
 
         return mu, sigma
 
     def sample(self, state):
+        # TODO: Check if this is correct see appendix of SAC paper as well as author implementation
         mu, sigma = self.forward(state)
         # sample from normal distribution and add noise for reparametrization trick
         prob = Normal(mu, sigma)
@@ -61,7 +63,7 @@ class Actor(nn.Module):
 
         # log probability of of actions for loss function
         log_probs = prob.log_prob(actions)
-        # enforce action bounds as proposed by the authors in appendix
+        # enforce action bounds as proposed by the authors in the appendix
         log_probs -= torch.log(1 - actions.pow(2) + self.reparam_noise)
         log_probs = log_probs.sum(1, keepdims=True)
 
