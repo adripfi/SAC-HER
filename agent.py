@@ -33,7 +33,8 @@ class Agent:
 
     def sample(self, state):
         state = torch.as_tensor(state, dtype=torch.float32).to(self.device).unsqueeze(0)
-        action, _ = self.policy.sample(state)
+        with torch.no_grad():
+            action, _ = self.policy.sample(state)
 
         return action.detach().cpu().numpy()[0]
 

@@ -8,9 +8,9 @@ hidden_size = 256
 alpha = 0.2
 buffer_size = int(10e6)
 batch_size = 32
-tau = 0.005
+tau = 0.002
 gamma = 0.99
-lr = 3e-4
+lr = 1e-3
 updates_per_step = 1
 max_steps = 1e6
 start_random = 1000
@@ -36,11 +36,19 @@ def main():
         episode_reward = 0
         episode_steps = 0
         done = False
+        rndm = True
         state = env.reset()
 
         while not done:
             # sample action from policy
             # TODO: add random steps
+            # if total_steps < start_random:
+            #     rndm = True
+            #     action = env.action_space.sample()
+            # else:
+            #     rndm = False
+            #     with torch.no_grad():
+            #         action = agent.sample(state)
             action = agent.sample(state)
 
             if len(memory) > batch_size:
@@ -53,13 +61,14 @@ def main():
             total_steps += 1
             episode_reward += reward
 
-            mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+            # mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+            done = False if episode_steps == env._max_episode_steps else done
 
-            memory.push(state, action, reward, next_state, mask)  # Append transition to memory
+            memory.push(state, action, reward, next_state, done)  # Append transition to memory
 
             state = next_state
 
-        print(f"Episode: {episode}, Reward: {episode_reward}")
+        print(f"Episode: {episode}, Reward: {episode_reward}, Total Steps: {total_steps}, Rand {rndm}")
         if total_steps > max_steps:
             break
     env.close()
