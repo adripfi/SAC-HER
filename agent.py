@@ -39,7 +39,7 @@ class Agent:
         return action.detach().cpu().numpy()[0]
 
     def get_policy_loss(self, states):
-        next_actions, pi_log_probs = self.policy(states)
+        next_actions, pi_log_probs = self.policy.sample(states)
         q1_target = self.q1_target.forward(states, next_actions)
         q2_target = self.q2_target.forward(states, next_actions)
         q_target_min = torch.min(q1_target, q2_target)
@@ -51,7 +51,7 @@ class Agent:
         # compute TD target using target q networks
         with torch.no_grad():
             # sample target actions from current policy $\alpha$
-            next_actions, pi_log_probs = self.policy(next_states)
+            next_actions, pi_log_probs = self.policy.sample(next_states)
 
             # Bellman backup
             q1_targets = self.q1_target.forward(next_states, next_actions)

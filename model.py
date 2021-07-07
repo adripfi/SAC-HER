@@ -57,15 +57,17 @@ class Actor(nn.Module):
         mu, sigma = self.forward(state)
         # sample from normal distribution and add noise for reparametrization trick
         prob = Normal(mu, sigma)
-        actions = prob.rsample()
+        x_t = prob.rsample()
+        y_t = torch.tanh(x_t)
 
         # squash gaussian and scale action beyond +/- 1
-        actions = torch.tanh(actions) * self.max_action
+        actions = y_t * self.max_action
+        log_probs = prob.log_prob(x_t)
 
         # log probability of of actions for loss function
-        log_probs = prob.log_prob(actions)
+        # log_probs = prob.log_prob(actions)
         # enforce action bounds as proposed by the authors in the appendix
-        log_probs -= torch.log(1 - actions.pow(2) + self.reparam_noise)
+        log_probs -= torch.log(self.max_action * ( 1 - y_t.pow(2)) + self.reparam_noise)
         log_probs = log_probs.sum(1, keepdims=True)
 
         return actions, log_probs
