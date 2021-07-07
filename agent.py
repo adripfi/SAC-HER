@@ -8,11 +8,12 @@ from model import Actor, Critic
 
 
 class Agent:
-    def __init__(self, state_dim, action_dim, action_high, device, lr, gamma=0.99, tau=0.005, alpha=None):
+    def __init__(self, state_dim, action_dim, action_high, device, lr, hidden_size=256, gamma=0.99, tau=0.005, alpha=None):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.action_high = action_high
         self.device = device
+        self.hidden_size = hidden_size
 
         self.lr = lr
         self.gamma = gamma
@@ -20,20 +21,20 @@ class Agent:
         self.alpha = alpha
 
         # two critics + target networks to mitigate overestimation bias using (clipped) double q trick
-        self.q1 = Critic(num_inputs=action_dim+state_dim)
+        self.q1 = Critic(num_inputs=action_dim+state_dim, hidden_size=self.hidden_size)
         self.q2 = Critic(num_inputs=action_dim+state_dim)
         self.q1_target = copy.deepcopy(self.q1)
         self.q2_target = copy.deepcopy(self.q2)
         self.q_optimizer = torch.optim.Adam(concatenate(self.q1.parameters(), self.q2.parameters()), lr=self.lr)
 
-        self.policy = Actor(input_size=self.state_dim, output_size=self.action_dim, max_action=self.action_high)
+        self.policy = Actor(input_size=self.state_dim, output_size=self.action_dim, max_action=self.action_high, hidden_size=self.hidden_size)
         self.pi_optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
 
     def sample(self, state):
-        state = torch.as_tensor(state).to(self.device)
-        action, _ = self.policy.forward(state)
+        state = torch.as_tensor(state, dtype=torch.float32).to(self.device).unsqueeze(0)
+        action, _ = self.policy.sample(state)
 
-        return action
+        return action.detach().numpy()[0]
 
     def get_policy_loss(self, states):
         next_actions, pi_log_probs = self.policy(states)

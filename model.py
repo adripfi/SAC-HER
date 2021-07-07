@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.distributions import Normal
 
 
@@ -15,8 +16,8 @@ class Critic(nn.Module):
 
     def forward(self, state, action):
         x = torch.cat((state, action), 1)
-        x = nn.ReLU(self.fc1(x))
-        x = nn.ReLU(self.fc2(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
 
         return self.fc3(x)
 
@@ -40,9 +41,9 @@ class Actor(nn.Module):
 
     def forward(self, state):
         x = self.fc1(state)
-        x = nn.ReLU(x)
+        x = F.relu(x)
         x = self.fc2(x)
-        x = nn.ReLU(x)
+        x = F.relu(x)
 
         mu = self.mu(x)
         sigma = self.sigma(x)
