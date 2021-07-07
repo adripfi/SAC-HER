@@ -21,7 +21,8 @@ def main():
     state_size = env.observation_space.shape[0]
     action_size = env.action_space.shape[0]
     action_high = env.action_space.high[0]
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # print(device)
     # device = "cpu"
 
     agent = Agent(state_size, action_size, action_high, device, lr, hidden_size, gamma, tau, alpha)

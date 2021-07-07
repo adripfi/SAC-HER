@@ -32,9 +32,9 @@ class ReplayBuffer:
 
         states = torch.as_tensor(self.states[indices], dtype=torch.float32).to(self.device)
         actions = torch.as_tensor(self.actions[indices], dtype=torch.float32).to(self.device)
-        rewards = torch.as_tensor(self.rewards[indices], dtype=torch.float32).to(self.device)
+        rewards = torch.as_tensor(self.rewards[indices], dtype=torch.float32).to(self.device).unsqueeze(1)
         next_states = torch.as_tensor(self.next_states[indices], dtype=torch.float32).to(self.device)
-        dones = torch.as_tensor(self.dones[indices], dtype=torch.float32).to(self.device)
+        dones = torch.as_tensor(self.dones[indices], dtype=torch.float32).to(self.device).unsqueeze(1)
 
         return states, actions, rewards, next_states, dones
 
