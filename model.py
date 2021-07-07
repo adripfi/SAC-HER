@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.distributions as Normal
+from torch.distributions import Normal
 
 
 class Critic(nn.Module):
@@ -11,10 +11,10 @@ class Critic(nn.Module):
 
         self.fc1 = nn.Linear(self.num_inputs, self.hidden_size)
         self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
-        self.fc3 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.fc3 = nn.Linear(self.hidden_size, 1)
 
     def forward(self, state, action):
-        x = torch.cat([state, action], 1)
+        x = torch.cat((state, action), 1)
         x = nn.ReLU(self.fc1(x))
         x = nn.ReLU(self.fc2(x))
 
