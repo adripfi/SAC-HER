@@ -6,9 +6,10 @@ from replay_buffer import ReplayBuffer
 from utils import LogUtil, test_agent
 
 
-max_episode = 400
+max_episode = 500
 hidden_size = 256
-alpha = 0.2
+alpha = 0.1
+auto_entropy = True
 buffer_size = int(10e6)
 batch_size = 128
 tau = 0.002
@@ -17,11 +18,12 @@ lr = 1e-3
 updates_per_step = 1
 max_steps = 1e6
 start_random = 2000
-eval_interval = 5 # episodes
-seed = None
+eval_interval = 5  # episodes
+seed = 42
 
 env = gym.make("LunarLanderContinuous-v2")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device {device} \n")
 # device = "cpu"
 
 if seed is not None:
@@ -34,7 +36,7 @@ def main():
     action_size = env.action_space.shape[0]
     action_high = env.action_space.high[0]
 
-    agent = Agent(state_size, action_size, action_high, device, lr, hidden_size, gamma, tau, alpha)
+    agent = Agent(state_size, action_size, action_high, device, lr, hidden_size, gamma, tau, alpha, auto_entropy)
     memory = ReplayBuffer(buffer_size, state_size, action_size, device)
     log = LogUtil()
 
@@ -56,8 +58,8 @@ def main():
 
             if len(memory) > batch_size:
                 for i in range(updates_per_step):
-                    q1_loss, q2_loss, pi_loss = agent.update_parameters(memory, batch_size)
-                    log.loss(q1_loss, q2_loss, pi_loss, 1, total_updates)
+                    q1_loss, q2_loss, pi_loss, alpha_loss = agent.update_parameters(memory, batch_size)
+                    log.loss(q1_loss, q2_loss, pi_loss, alpha_loss, agent.alpha, total_updates)
                     total_updates += 1
 
             next_state, reward, done, _ = env.step(action)
@@ -81,6 +83,7 @@ def main():
 
             print(f"Episodes trained: {episode}, Eval Reward: {eval_reward}, Episode Steps: {eval_steps}")
             log.reward(episode, eval_reward, "eval")
+            log.save_checkpoints(agent, memory)
 
         if total_steps > max_steps:
             break

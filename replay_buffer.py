@@ -3,15 +3,15 @@ import torch
 
 
 class ReplayBuffer:
-    def __init__(self, size, obs_shape, act_shape, device):
+    def __init__(self, size, state_dim, action_dim, device):
         self.max_size = size
         self.curr_size = 0
         self.ptr = 0
         self.device = device
 
-        self.states = np.zeros((size, obs_shape), dtype=np.float32)
-        self.next_states = np.zeros((size, obs_shape), dtype=np.float32)
-        self.actions = np.zeros((size, act_shape), dtype=np.float32)
+        self.states = np.zeros((size, state_dim), dtype=np.float32)
+        self.next_states = np.zeros((size, state_dim), dtype=np.float32)
+        self.actions = np.zeros((size, action_dim), dtype=np.float32)
         self.rewards = np.zeros(size, dtype=np.float32)
         self.dones = np.zeros(size, dtype=np.float32)
 
@@ -28,6 +28,7 @@ class ReplayBuffer:
         self.curr_size = np.min((self.curr_size + 1, self.max_size))
 
     def sample(self, batch_size):
+        # sample batch_size random idx
         indices = np.random.randint(low=0, high=self.curr_size, size=batch_size)
 
         states = torch.as_tensor(self.states[indices], dtype=torch.float32).to(self.device)

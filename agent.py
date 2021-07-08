@@ -8,7 +8,8 @@ from model import Actor, Critic
 
 
 class Agent:
-    def __init__(self, state_dim, action_dim, action_high, device, lr, hidden_size=256, gamma=0.99, tau=0.005, alpha=None):
+    def __init__(self, state_dim, action_dim, action_high, device, lr, hidden_size=256, gamma=0.99, tau=0.005,
+                 alpha=0.2, auto_entropy=True):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.action_high = action_high
@@ -19,18 +20,26 @@ class Agent:
         self.gamma = gamma
         self.tau = tau
         self.alpha = alpha
+        self.auto_entropy = auto_entropy
 
         # two critics + target networks to mitigate overestimation bias using (clipped) double q trick
-        self.q1 = Critic(num_inputs=action_dim+state_dim, hidden_size=self.hidden_size).to(self.device)
-        self.q2 = Critic(num_inputs=action_dim+state_dim).to(self.device)
+        self.q1 = Critic(num_inputs=action_dim + state_dim, hidden_size=self.hidden_size).to(self.device)
+        self.q2 = Critic(num_inputs=action_dim + state_dim).to(self.device)
         self.q1_target = copy.deepcopy(self.q1)
         self.q2_target = copy.deepcopy(self.q2)
-        # self.q1_optimizer = torch.optim.Adam(self.q1.parameters(), lr=self.lr)
-        # self.q2_optimizer = torch.optim.Adam(self.q2.parameters(), lr=self.lr)
         self.q_optimizer = torch.optim.Adam(concatenate(self.q1.parameters(), self.q2.parameters()), lr=self.lr)
 
-        self.policy = Actor(input_size=self.state_dim, output_size=self.action_dim, max_action=self.action_high, hidden_size=self.hidden_size).to(self.device)
+        # Gaussian policy
+        self.policy = Actor(input_size=self.state_dim, output_size=self.action_dim, max_action=self.action_high,
+                            hidden_size=self.hidden_size).to(self.device)
         self.pi_optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
+
+        # automatic entropy tuning
+        if self.auto_entropy:
+            # entropy target heuristic -|A| proposed by the authors
+            self.entropy_target = -self.action_dim
+            self.log_alpha = torch.tensor(np.log(self.alpha), requires_grad=True, device=self.device)
+            self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=lr)
 
     def sample(self, state):
         state = torch.as_tensor(state, dtype=torch.float32).to(self.device).unsqueeze(0)
@@ -46,12 +55,12 @@ class Agent:
         q_target_min = torch.min(q1_target, q2_target)
         pi_loss = (self.alpha * pi_log_probs - q_target_min).mean()
 
-        return pi_loss
+        return pi_loss, pi_log_probs
 
     def get_q_loss(self, states, actions, rewards, dones, next_states):
         # compute TD target using target q networks
         with torch.no_grad():
-            # sample target actions from current policy $\alpha$
+            # sample target actions from current policy
             next_actions, pi_log_probs = self.policy.sample(next_states)
 
             # Bellman backup
@@ -59,13 +68,11 @@ class Agent:
             q2_targets = self.q2_target.forward(next_states, next_actions)
             y = rewards + self.gamma * (1 - dones) * (torch.min(q1_targets, q2_targets) - self.alpha * pi_log_probs)
 
-        # compute actor losses
+        # compute critic losses
         q1 = self.q1.forward(states, actions)
         q1_loss = F.mse_loss(q1, y)
         q2 = self.q2.forward(states, actions)
         q2_loss = F.mse_loss(q2, y)
-
-        # TODO: check if summing up losses this way is correct
 
         return q1_loss, q2_loss
 
@@ -77,23 +84,35 @@ class Agent:
     def update_parameters(self, memory, batch_size):
         states, actions, rewards, next_states, dones = memory.sample(batch_size)
 
-        # update actor
+        # update critics
         self.q_optimizer.zero_grad()
         q1_loss, q2_loss = self.get_q_loss(states, actions, rewards, dones, next_states)
+        # TODO: check if summing up losses this way is correct
         q_loss = q1_loss + q2_loss
         q_loss.backward()
         self.q_optimizer.step()
 
-        # update critic
+        # update actor
         self.pi_optimizer.zero_grad()
-        pi_loss = self.get_policy_loss(states)
+        pi_loss, pi_log = self.get_policy_loss(states)
         pi_loss.backward()
         self.pi_optimizer.step()
 
-        # update target networks
+        # update critic target networks
         self.soft_update(self.q1, self.q1_target)
         self.soft_update(self.q2, self.q2_target)
 
-        return q1_loss, q2_loss, pi_loss
+        # update temperature
+        if self.auto_entropy:
+            # TODO: check sign of log prob
+            self.alpha_optimizer.zero_grad()
+            alpha_loss = -(self.log_alpha * (pi_log + self.entropy_target).detach()).mean()
+            alpha_loss.backward()
+            self.alpha_optimizer.step()
 
+            self.alpha = self.log_alpha.exp()
 
+        else:
+            alpha_loss = 0
+
+        return q1_loss, q2_loss, pi_loss, alpha_loss
