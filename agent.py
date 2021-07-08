@@ -97,4 +97,6 @@ class Agent:
         self.soft_update(self.q1, self.q1_target)
         self.soft_update(self.q2, self.q2_target)
 
+        return q1_loss, q2_loss, pi_loss
+
 
