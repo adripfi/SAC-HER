@@ -76,11 +76,15 @@ def main():
         log.reward(episode, episode_reward, "train")
 
         if not episode % eval_interval:
+            # evaluate current policy
             eval_reward, eval_steps = test_agent(agent, env)
+
             print(f"Episodes trained: {episode}, Eval Reward: {eval_reward}, Episode Steps: {eval_steps}")
+            log.reward(episode, eval_reward, "eval")
 
         if total_steps > max_steps:
             break
+
     env.close()
 
     return agent
