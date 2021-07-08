@@ -25,8 +25,9 @@ class Agent:
         self.q2 = Critic(num_inputs=action_dim+state_dim).to(self.device)
         self.q1_target = copy.deepcopy(self.q1)
         self.q2_target = copy.deepcopy(self.q2)
-        self.q1_optimizer = torch.optim.Adam(self.q1.parameters(), lr=self.lr)
-        self.q2_optimizer = torch.optim.Adam(self.q2.parameters(), lr=self.lr)
+        # self.q1_optimizer = torch.optim.Adam(self.q1.parameters(), lr=self.lr)
+        # self.q2_optimizer = torch.optim.Adam(self.q2.parameters(), lr=self.lr)
+        self.q_optimizer = torch.optim.Adam(concatenate(self.q1.parameters(), self.q2.parameters()), lr=self.lr)
 
         self.policy = Actor(input_size=self.state_dim, output_size=self.action_dim, max_action=self.action_high, hidden_size=self.hidden_size).to(self.device)
         self.pi_optimizer = torch.optim.Adam(self.policy.parameters(), lr=self.lr)
@@ -65,7 +66,6 @@ class Agent:
         q2_loss = F.mse_loss(q2, y)
 
         # TODO: check if summing up losses this way is correct
-        # q_loss = F.mse_loss(q1, y) + F.mse_loss(q2, y)
 
         return q1_loss, q2_loss
 
@@ -78,14 +78,11 @@ class Agent:
         states, actions, rewards, next_states, dones = memory.sample(batch_size)
 
         # update actor
-        self.q1_optimizer.zero_grad()
-        self.q2_optimizer.zero_grad()
+        self.q_optimizer.zero_grad()
         q1_loss, q2_loss = self.get_q_loss(states, actions, rewards, dones, next_states)
-
-        q1_loss.backward()
-        self.q1_optimizer.step()
-        q2_loss.backward()
-        self.q2_optimizer.step()
+        q_loss = q1_loss + q2_loss
+        q_loss.backward()
+        self.q_optimizer.step()
 
         # update critic
         self.pi_optimizer.zero_grad()
