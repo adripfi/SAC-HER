@@ -1,11 +1,11 @@
 import os
 import torch
 from torch.utils.tensorboard import SummaryWriter
-import pickle
+
 
 class LogUtil:
-    def __init__(self):
-        self.writer = SummaryWriter()
+    def __init__(self, comment=""):
+        self.writer = SummaryWriter(comment=comment)
 
         self.path_checkpoints = os.path.join("models", os.path.split(self.writer.file_writer.event_writer._logdir)[-1])
         if not os.path.exists(self.path_checkpoints):
@@ -18,7 +18,6 @@ class LogUtil:
         self.actor_path = os.path.join(self.path_checkpoints, "actor")
         self.temp_path = os.path.join(self.path_checkpoints, "alpha")
         self.memory_path = os.path.join(self.path_checkpoints, "memory.p")
-
 
     def loss(self, q1_loss, q2_loss, pi_loss, alpha_loss, alpha, step):
         self.writer.add_scalar("loss/q1", q1_loss, step)
@@ -41,20 +40,12 @@ class LogUtil:
         torch.save(agent.policy.state_dict(), self.actor_path)
         torch.save(agent.alpha, self.temp_path)
 
-        with open(self.memory_path, "wb") as mem:
-            pickle.dump(memory, mem)
-
     def load_checkpoints(self, agent, path):
         agent.q1.load_state_dict(torch.load(os.path.join(path, "critic_q1")))
         agent.q2.load_state_dict(torch.load(os.path.join(path, "critic_q2")))
         agent.q1_target.load_state_dict(torch.load(os.path.join(path, "critic_q1_target")))
         agent.q2_target.load_state_dict(torch.load(os.path.join(path, "critic_q2_target")))
         agent.policy.load_state_dict(torch.load(os.path.join(path, "actor")))
-
-        with open(os.path.join(path, "memory.p"), "rb") as mem:
-            memory = pickle.load(mem)
-
-
 
 
 def test_agent(agent, env, render=False):

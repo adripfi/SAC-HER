@@ -1,7 +1,6 @@
 import torch
 from itertools import chain as concatenate
 import numpy as np
-from replay_buffer import ReplayBuffer
 import torch.nn.functional as F
 import copy
 from model import Actor, Critic
@@ -66,6 +65,8 @@ class Agent:
             # Bellman backup
             q1_targets = self.q1_target.forward(next_states, next_actions)
             q2_targets = self.q2_target.forward(next_states, next_actions)
+            # compute TD target using minimum value of target networks
+            # additionally filter tuples at end of episode (done == 1)
             y = rewards + self.gamma * (1 - dones) * (torch.min(q1_targets, q2_targets) - self.alpha * pi_log_probs)
 
         # compute critic losses
@@ -106,13 +107,13 @@ class Agent:
         if self.auto_entropy:
             # TODO: check sign of log prob
             self.alpha_optimizer.zero_grad()
-            alpha_loss = -(self.log_alpha * (pi_log + self.entropy_target).detach()).mean()
+            alpha_loss = (self.log_alpha * (-pi_log - self.entropy_target).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()
 
             self.alpha = self.log_alpha.exp()
-
         else:
+            # only for logging purposes
             alpha_loss = 0
 
         return q1_loss, q2_loss, pi_loss, alpha_loss

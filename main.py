@@ -6,22 +6,23 @@ from replay_buffer import ReplayBuffer
 from utils import LogUtil, test_agent
 
 
-max_episode = 500
+max_episode = int(1e6)
 hidden_size = 256
-alpha = 0.1
+alpha = 0.2
 auto_entropy = True
-buffer_size = int(10e6)
-batch_size = 128
-tau = 0.002
+buffer_size = int(1e6)
+batch_size = 256
+tau = 0.005
 gamma = 0.99
-lr = 1e-3
+lr = 3e-4
 updates_per_step = 1
 max_steps = 1e6
 start_random = 2000
-eval_interval = 5  # episodes
-seed = 42
+eval_interval = 20  # episodes
+seed = None
 
-env = gym.make("LunarLanderContinuous-v2")
+env_id = "Hopper-v2"
+env = gym.make(env_id)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device} \n")
 # device = "cpu"
@@ -38,7 +39,7 @@ def main():
 
     agent = Agent(state_size, action_size, action_high, device, lr, hidden_size, gamma, tau, alpha, auto_entropy)
     memory = ReplayBuffer(buffer_size, state_size, action_size, device)
-    log = LogUtil()
+    log = LogUtil(env_id)
 
     total_steps = 0
     total_updates = 0
@@ -75,7 +76,7 @@ def main():
 
             state = next_state
 
-        log.reward(episode, episode_reward, "train")
+        log.reward(total_steps, episode_reward, "train")
 
         if not episode % eval_interval:
             # evaluate current policy
