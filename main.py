@@ -4,9 +4,10 @@ import numpy as np
 from agent import Agent
 from replay_buffer import ReplayBuffer
 from utils import LogUtil, test_agent
+import os
+os.environ["LD_LIBRARY_PATH"] = "$LD_LIBRARY_PATH:/home/adrian/.mujoco/mujoco200/bin"
 
-
-max_episode = 500
+max_episode = int(1e6)
 hidden_size = 256
 alpha = 0.1
 auto_entropy = True
@@ -21,7 +22,7 @@ start_random = 2000
 eval_interval = 5  # episodes
 seed = 42
 
-env = gym.make("LunarLanderContinuous-v2")
+env = gym.make("BipedalWalkerHardcore-v3")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device} \n")
 # device = "cpu"

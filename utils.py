@@ -3,6 +3,37 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import pickle
 
+class EnvWrapper:
+    def __init__(self, env):
+        self.env = env 
+    
+    def reset(self):
+        obs = self.env.reset()
+        return obs["observation"]
+
+    def step(self, action):
+        obs = self.env.step(action)
+        return obs[0]["observation"], obs[1], obs[2], obs[3]
+
+    def sample(self):
+        return self.env.action_space.sample()
+
+    def _max_episode_steps(self):
+        return self.env._max_episode_steps
+
+    def close(self):
+        self.env.close()
+
+    def render(self):
+        self.env.render()
+
+
+
+
+
+
+
+
 class LogUtil:
     def __init__(self):
         self.writer = SummaryWriter()
@@ -41,8 +72,8 @@ class LogUtil:
         torch.save(agent.policy.state_dict(), self.actor_path)
         torch.save(agent.alpha, self.temp_path)
 
-        with open(self.memory_path, "wb") as mem:
-            pickle.dump(memory, mem)
+        # with open(self.memory_path, "wb") as mem:
+        #     pickle.dump(memory, mem)
 
     def load_checkpoints(self, agent, path):
         agent.q1.load_state_dict(torch.load(os.path.join(path, "critic_q1")))
@@ -51,8 +82,9 @@ class LogUtil:
         agent.q2_target.load_state_dict(torch.load(os.path.join(path, "critic_q2_target")))
         agent.policy.load_state_dict(torch.load(os.path.join(path, "actor")))
 
-        with open(os.path.join(path, "memory.p"), "rb") as mem:
-            memory = pickle.load(mem)
+        # with open(os.path.join(path, "memory.p"), "rb") as mem:
+        #     memory = pickle.load(mem)
+
 
 
 
@@ -72,6 +104,7 @@ def test_agent(agent, env, render=False):
         state = next_state
 
     env.close()
+    print(f"Reward: {total_reward}")
 
     return total_reward, steps
 
