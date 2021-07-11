@@ -1,27 +1,32 @@
+import os
+
 import gym
 import torch
 import numpy as np
 from agent import Agent
 from replay_buffer import ReplayBuffer
 from utils import LogUtil, test_agent
+from her import HindsightReplayBuffer
+os.environ["LD_LIBRARY_PATH"] = "$LD_LIBRARY_PATH:/home/adrian/.mujoco/mujoco200/bin"
 
 
-hidden_size = 256
-alpha = 0.2
+
+hidden_size = 512
+alpha = 1.
 auto_entropy = True
 buffer_size = int(1e6)
-batch_size = 256
-tau = 0.005
-gamma = 0.99
-lr = 3e-4
+batch_size = 1024
+tau = 0.0005
+gamma = 0.95
+lr = 0.0005
 updates_per_step = 1
 max_steps = int(1e6)
 max_episodes = int(1e6)
-start_random = 2000
+start_random = 10000
 eval_interval = 20  # episodes
 seed = None
 
-env_id = "Humanoid-v2"
+env_id = "FetchPickAndPlace-v1"
 env = gym.make(env_id)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device} \n")
@@ -30,15 +35,23 @@ print(f"Using device {device} \n")
 if seed is not None:
     torch.manual_seed(seed)
     np.random.seed(seed)
+    env.seed(seed)
 
 
 def main():
-    state_size = env.observation_space.shape[0]
-    action_size = env.action_space.shape[0]
+    # state_size = env.observation_space.shape[0]
+    # action_size = env.action_space.shape[0]
+    # goal_des_size = 0
     action_high = env.action_space.high[0]
+    state_size = env.observation_space['observation'].shape[0]
+    goal_des_size = env.observation_space['desired_goal'].shape[0]
+    # achieved_goal_shape = env.observation_space[prefix + 'achieved_goal'].shape
+    action_size = env.action_space.shape[0]
+    print("action", action_size, "state", state_size, "goal_des", goal_des_size)
 
-    agent = Agent(state_size, action_size, action_high, device, lr, hidden_size, gamma, tau, alpha, auto_entropy)
-    memory = ReplayBuffer(buffer_size, state_size, action_size, device)
+    agent = Agent(state_size, action_size, goal_des_size, action_high, device, lr, hidden_size, gamma, tau, alpha, auto_entropy)
+    # TODO: clean memory init i.e. remove redundant action, state and des goal dim. computation
+    memory = HindsightReplayBuffer(False, env, 1, env.observation_space, env.action_space, buffer_size, device)
     log = LogUtil(env_id)
 
     updates = 0
@@ -47,7 +60,10 @@ def main():
         episode_steps = 0
         total_steps = 0
         done = False
-        state = env.reset()
+        state_dict = env.reset()
+        state = state_dict["observation"]
+        goal_desired = state_dict["desired_goal"]
+        successes = np.zeros(eval_interval)
 
         while not done:
             if total_steps < start_random:
@@ -55,7 +71,7 @@ def main():
                 action = env.action_space.sample()
             else:
                 # sample action from current policy
-                action = agent.sample(state)
+                action = agent.sample(state, goal_desired)
 
             if len(memory) > batch_size:
                 # update agent's weights
@@ -64,27 +80,34 @@ def main():
                     log.loss(q1_loss, q2_loss, pi_loss, alpha_loss, agent.alpha, updates)
                     updates += 1
 
-            next_state, reward, done, _ = env.step(action)
+            state_dict, reward, done, info = env.step(action)
+            next_state = state_dict["observation"]
+            goal_achieved = state_dict["achieved_goal"]
 
             episode_steps += 1
             total_steps += 1
             episode_reward += reward
 
             # allow infinite bootstrapping when the episode terminated due to time limit
-            done = False if episode_steps == env._max_episode_steps else done
+            # TODO: check for done max
+            done = False if episode_steps == env.env.spec.max_episode_steps else done
 
-            memory.push(state, action,  reward, next_state, done)
+            memory.add(state, goal_desired, goal_achieved, action,  reward, next_state, done, done)
 
             state = next_state
+            goal_desired = state_dict["desired_goal"]
 
-        log.reward(total_steps, episode_reward, "train")
+        log.reward(updates, episode_reward, "train")
+        successes[episodes % eval_interval] = float(info["is_success"])
 
         if not episodes % eval_interval:
             # evaluate current policy
             eval_reward, eval_steps = test_agent(agent, env)
 
-            print(f"Episodes trained: {episodes}, Eval Reward: {eval_reward}, Episode Steps: {eval_steps}")
+            successes_mean = np.mean(successes)
+            print(f"Episodes trained: {episodes}, Eval Reward: {eval_reward}, Succ: {successes_mean},  Episode Steps: {eval_steps}")
             log.reward(episodes, eval_reward, "eval")
+            log.reward(episodes, successes_mean, "success")
             log.save_checkpoints(agent, memory)
 
     env.close()

@@ -14,8 +14,10 @@ class Critic(nn.Module):
         self.fc2 = nn.Linear(self.hidden_size, self.hidden_size)
         self.fc3 = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, state, action):
-        x = torch.cat((state, action), 1)
+    def forward(self, state, goal_desired, action):
+        x = torch.cat([state, goal_desired, action], dim=-1)
+
+        # x = torch.cat((state, action), 1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
 
@@ -52,7 +54,11 @@ class Actor(nn.Module):
 
         return mu, sigma
 
-    def sample(self, state):
+    def sample(self, state, goal_desired):
+        # TODO: Check dim!!
+        state = torch.cat([state, goal_desired], dim=-1)
+
+
         # TODO: Check if this is correct see appendix of SAC paper as well as author implementation
         mu, sigma = self.forward(state)
         # sample from normal distribution and add noise for reparametrization trick

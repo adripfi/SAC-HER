@@ -31,6 +31,9 @@ class LogUtil:
             self.writer.add_scalar("reward/train", reward, episode)
         elif type == "eval":
             self.writer.add_scalar("reward/eval", reward, episode)
+        elif type == "success":
+            self.writer.add_scalar("reward/success", reward, episode)
+
 
     def save_checkpoints(self, agent, memory):
         torch.save(agent.q1.state_dict(), self.q1_path)
@@ -49,14 +52,19 @@ class LogUtil:
 
 
 def test_agent(agent, env, render=False):
-    state = env.reset()
+    state_dict = env.reset()
+    state = state_dict["observation"]
+    goal_desired = state_dict["desired_goal"]
     total_reward = 0
     steps = 0
     done = False
     while not done:
         if render: env.render()
-        action = agent.sample(state)
-        next_state, reward, done, _ = env.step(action)
+        action = agent.sample(state, goal_desired)
+        # next_state, reward, done, _ = env.step(action)
+        state_dict, reward, done, info = env.step(action)
+        next_state = state_dict["observation"]
+        # goal_achieved = state_dict["achieved_goal"]
 
         total_reward += reward
         steps += 1
@@ -65,6 +73,11 @@ def test_agent(agent, env, render=False):
     env.close()
 
     return total_reward, steps
+
+class EnvWrapper:
+    def __init__(self, env):
+        self.env = env
+
 
 
 
