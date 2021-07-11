@@ -16,6 +16,7 @@ gamma = 0.99
 lr = 3e-4
 updates_per_step = 1
 max_steps = int(1e6)
+max_episodes = int(1e6)
 start_random = 2000
 eval_interval = 20  # episodes
 seed = None
@@ -41,10 +42,10 @@ def main():
     log = LogUtil(env_id)
 
     updates = 0
-    episodes = 0
-    for total_steps in range(max_steps):
+    for episodes in range(max_episodes):
         episode_reward = 0
         episode_steps = 0
+        total_steps = 0
         done = False
         state = env.reset()
 
@@ -66,6 +67,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             episode_steps += 1
+            total_steps += 1
             episode_reward += reward
 
             # allow infinite bootstrapping when the episode terminated due to time limit
@@ -75,7 +77,6 @@ def main():
 
             state = next_state
 
-        episodes += 1
         log.reward(total_steps, episode_reward, "train")
 
         if not episodes % eval_interval:
