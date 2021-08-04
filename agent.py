@@ -70,7 +70,9 @@ class Agent:
             q2_targets = self.q2_target.forward(next_states, goals_desired, next_actions)
             # compute TD target using minimum value of target networks
             # additionally filter tuples at end of episode (done == 1)
-            y = rewards + self.gamma * (1 - dones) * (torch.min(q1_targets, q2_targets) - self.alpha * pi_log_probs)
+            # y = rewards + self.gamma * (1 - dones) * (torch.min(q1_targets, q2_targets) - self.alpha * pi_log_probs)
+            target_V = torch.min(q1_targets, q2_targets) - self.alpha * pi_log_probs
+            y = rewards + (dones * self.gamma * target_V)
 
         # compute critic losses
         q1 = self.q1.forward(states, goals_desired, actions)

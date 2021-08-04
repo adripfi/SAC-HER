@@ -7,22 +7,22 @@ from agent import Agent
 from replay_buffer import ReplayBuffer
 from utils import LogUtil, test_agent
 from her import HindsightReplayBuffer
-os.environ["LD_LIBRARY_PATH"] = "$LD_LIBRARY_PATH:/home/adrian/.mujoco/mujoco200/bin"
+# os.environ["LD_LIBRARY_PATH"] = "$LD_LIBRARY_PATH:/home/adrian/.mujoco/mujoco200/bin"
 
 
 
 hidden_size = 512
-alpha = 1.
+alpha = 0.1
 auto_entropy = True
 buffer_size = int(1e6)
-batch_size = 1024
-tau = 0.0005
+batch_size = 128
+tau = 0.005
 gamma = 0.95
-lr = 0.0005
+lr = 0.0006
 updates_per_step = 1
 max_steps = int(1e6)
 max_episodes = int(1e6)
-start_random = 10000
+start_random = 1000
 eval_interval = 20  # episodes
 seed = None
 
@@ -90,9 +90,11 @@ def main():
 
             # allow infinite bootstrapping when the episode terminated due to time limit
             # TODO: check for done max
-            done = False if episode_steps == env.env.spec.max_episode_steps else done
+            done = float(done)
+            done_no_max = 0 if episode_steps + 1 == env.spec.max_episode_steps else done
+            # done = False if episode_steps == env.env.spec.max_episode_steps else done
 
-            memory.add(state, goal_desired, goal_achieved, action,  reward, next_state, done, done)
+            memory.add(state, goal_desired, goal_achieved, action,  reward, next_state, done, done_no_max)
 
             state = next_state
             goal_desired = state_dict["desired_goal"]
