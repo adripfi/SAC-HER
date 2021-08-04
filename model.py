@@ -23,12 +23,12 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, input_size, output_size, max_action, reparam_noise=1e-6, max_sigma=2, hidden_size=256):
+    def __init__(self, input_size, output_size, max_action, const_noise=1e-6, max_sigma=2, hidden_size=256): 
         super(Actor, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
         self.max_action = torch.tensor(max_action)
-        self.reparam_noise = reparam_noise
+        self.const_noise = const_noise
         self.max_sigma = max_sigma
         self.hidden_size = hidden_size
         # environment specific scaling factor for actions
@@ -48,26 +48,26 @@ class Actor(nn.Module):
         mu = self.mu(x)
         sigma = self.sigma(x)
         # clip sigma values to reduce width of distribution
-        sigma = torch.clamp(sigma, min=self.reparam_noise, max=self.max_sigma)
+        sigma = torch.clamp(sigma, min=self.const_noise, max=self.max_sigma)
 
         return mu, sigma
 
     def sample(self, state):
-        # TODO: Check if this is correct see appendix of SAC paper as well as author implementation
         mu, sigma = self.forward(state)
         # sample from normal distribution and add noise for reparametrization trick
         prob = Normal(mu, sigma)
-        x_t = prob.rsample()
-        y_t = torch.tanh(x_t)
+        n = prob.rsample()
 
-        # squash gaussian and scale action beyond +/- 1
-        actions = y_t * self.max_action
-        log_probs = prob.log_prob(x_t)
+        # squash gaussian 
+        a = torch.tanh(n)
 
-        # log probability of of actions for loss function
-        # log_probs = prob.log_prob(actions)
+        # get log probs of action sampled
+        log_probs = prob.log_prob(n)
         # enforce action bounds as proposed by the authors in the appendix
-        log_probs -= torch.log(self.max_action * ( 1 - y_t.pow(2)) + self.reparam_noise)
+        log_probs -= torch.log(self.max_action * ( 1 - a.pow(2)) + self.const_noise)
         log_probs = log_probs.sum(1, keepdims=True)
+
+        # scale actions beyond +/-1
+        actions = a * self.max_action
 
         return actions, log_probs

@@ -59,7 +59,7 @@ def main():
 
             if len(memory) > batch_size:
                 # update agent's weights
-                for i in range(updates_per_step):
+                for _ in range(updates_per_step):
                     q1_loss, q2_loss, pi_loss, alpha_loss = agent.update_parameters(memory, batch_size)
                     log.loss(q1_loss, q2_loss, pi_loss, alpha_loss, agent.alpha, updates)
                     updates += 1

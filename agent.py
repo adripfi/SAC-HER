@@ -88,7 +88,6 @@ class Agent:
         # update critics
         self.q_optimizer.zero_grad()
         q1_loss, q2_loss = self.get_q_loss(states, actions, rewards, dones, next_states)
-        # TODO: check if summing up losses this way is correct
         q_loss = q1_loss + q2_loss
         q_loss.backward()
         self.q_optimizer.step()
@@ -105,7 +104,6 @@ class Agent:
 
         # update temperature
         if self.auto_entropy:
-            # TODO: check sign of log prob
             self.alpha_optimizer.zero_grad()
             alpha_loss = (self.log_alpha * (-pi_log - self.entropy_target).detach()).mean()
             alpha_loss.backward()
