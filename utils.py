@@ -1,9 +1,10 @@
 import os
+import numpy as np
+import random
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch import distributions as pyd
 import math
-
 
 
 class LogUtil:
@@ -53,6 +54,14 @@ class LogUtil:
         agent.q2_target.load_state_dict(torch.load(os.path.join(path, "critic_q2_target")))
         agent.policy.load_state_dict(torch.load(os.path.join(path, "actor")))
 
+
+def set_seed(seed, device, env):
+    torch.manual_seed(seed)
+    if device == "cuda":
+        torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    env.seed(seed)
+    random.seed(seed)
 
 def eval(agent, env, render=False):
     state_dict = env.reset()
