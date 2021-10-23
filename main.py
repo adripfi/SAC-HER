@@ -28,7 +28,7 @@ start_learning = int(1e4)
 eval_interval = 100  # episodes
 seed = 8
 
-env_id = "FetchPickAndPlace-v1"
+env_id = "FetchReach-v1"
 
 env = gym.make(env_id)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -46,15 +46,10 @@ if seed is not None:
 
 
 def train():
-    # state_size = env.observation_space.shape[0]
-    # action_size = env.action_space.shape[0]
-    # goal_des_size = 0
     action_high = env.action_space.high[0]
     state_size = env.observation_space['observation'].shape[0]
     goal_des_size = env.observation_space['desired_goal'].shape[0]
-    # achieved_goal_shape = env.observation_space[prefix + 'achieved_goal'].shape
     action_size = env.action_space.shape[0]
-    # print("action", action_size, "state", state_size, "goal_des", goal_des_size)
 
     agent = Agent(state_size, action_size, goal_des_size, action_high, device, lr, hidden_size, gamma, tau, alpha, auto_entropy)
     # TODO: clean memory init i.e. remove redundant action, state and des goal dim. computation
@@ -80,7 +75,6 @@ def train():
                 # sample action from current policy
                 action = agent.sample(state, goal_desired)
 
-            # print(f"len meme {len(memory)}, steps {episode_steps}, start {start_learning}, bool {len(memory) > batch_size and total_steps > start_learning}")
             if total_steps > start_learning:
                 # update agent's weights
                 for i in range(updates_per_step):
@@ -96,10 +90,8 @@ def train():
             episode_reward += reward
 
             # allow infinite bootstrapping when the episode terminated due to step limit
-            # TODO: check for done max
             done = float(done)
             done_no_max = 0 if episode_steps + 1 == env.spec.max_episode_steps else done
-            # done = False if episode_steps == env.env.spec.max_episode_steps else done
 
             memory.add(state, goal_desired, goal_achieved, action,  reward, next_state, done, done_no_max)
 
@@ -115,7 +107,7 @@ def train():
             eval_reward, eval_steps, success = eval(agent, env)
 
             # successes_mean = np.mean(successes)
-            print(f"Steps {total_steps}, Episodes trained: {episodes}, Eval Reward: {eval_reward}, Succ: {success},  Episode Steps: {eval_steps}")
+            print(f"Steps: {total_steps}, Episodes trained: {episodes}, Eval Reward: {eval_reward}, Succ: {success}, Episode Steps: {eval_steps}")
             log.reward(total_steps, eval_reward, "eval")
             log.reward(total_steps, success, "success")
             log.save_checkpoints(agent, memory)
